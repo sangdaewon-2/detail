@@ -1,0 +1,429 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+<meta name="theme-color" content="#1f6feb">
+<title>조합원 조회</title>
+<style>
+  :root{
+    --bg:#0d1117; --card:#161b22; --card2:#1c232c; --line:#2d333b;
+    --txt:#e6edf3; --muted:#8b949e; --accent:#1f6feb; --accent2:#388bfd;
+    --pos:#2ea043; --neg:#da3633; --warn:#d29922;
+  }
+  *{box-sizing:border-box; -webkit-tap-highlight-color:transparent;}
+  html,body{margin:0; padding:0;}
+  body{
+    background:var(--bg); color:var(--txt);
+    font-family:-apple-system,BlinkMacSystemFont,"Apple SD Gothic Neo","Pretendard","Malgun Gothic",sans-serif;
+    line-height:1.5; min-height:100vh;
+  }
+  .wrap{max-width:560px; margin:0 auto; padding:20px 16px 60px;}
+  header h1{font-size:20px; margin:6px 0 2px; letter-spacing:-.3px;}
+  header p{color:var(--muted); font-size:13px; margin:0 0 18px;}
+
+  .search-box{display:flex; gap:8px; margin-bottom:14px;}
+  .search-box input{
+    flex:1; min-width:0; padding:14px 14px; font-size:16px;
+    background:var(--card); border:1px solid var(--line); border-radius:12px; color:var(--txt);
+  }
+  .search-box input:focus{outline:none; border-color:var(--accent2);}
+  .btn{
+    border:none; border-radius:12px; padding:14px 18px; font-size:16px; font-weight:600;
+    background:var(--accent); color:#fff; cursor:pointer; white-space:nowrap;
+  }
+  .btn:active{background:var(--accent2);}
+  .btn:disabled{opacity:.55;}
+  .btn-sm{padding:9px 14px; font-size:14px;}
+  .btn-ghost{background:var(--card2); color:var(--txt); border:1px solid var(--line);}
+
+  .hint{color:var(--muted); font-size:12.5px; margin:2px 2px 0;}
+  .status-msg{padding:14px; border-radius:12px; background:var(--card); border:1px solid var(--line); color:var(--muted); font-size:14px; margin-top:12px;}
+  .status-msg.err{border-color:var(--neg); color:#ffb3ae;}
+
+  /* 동명이인 선택 */
+  .pick-title{font-size:14px; color:var(--muted); margin:18px 2px 10px;}
+  .pick-list{display:flex; flex-direction:column; gap:10px;}
+  .pick-item{
+    text-align:left; width:100%; background:var(--card); border:1px solid var(--line);
+    border-radius:14px; padding:14px; cursor:pointer; color:var(--txt);
+  }
+  .pick-item:active{border-color:var(--accent2); background:var(--card2);}
+  .pick-item .jibun{font-size:17px; font-weight:700;}
+  .pick-item .sub{font-size:13px; color:var(--muted); margin-top:4px; word-break:break-all;}
+
+  /* 상세 */
+  .detail-head{
+    background:linear-gradient(135deg,#1f6feb,#388bfd); border-radius:18px; padding:18px 18px 16px;
+    margin:6px 0 14px; color:#fff;
+  }
+  .detail-head .name{font-size:24px; font-weight:800; letter-spacing:-.5px;}
+  .detail-head .jibun{font-size:14px; opacity:.92; margin-top:2px;}
+  .score-pill{
+    display:inline-flex; align-items:baseline; gap:6px; margin-top:12px;
+    background:rgba(255,255,255,.16); padding:8px 14px; border-radius:999px;
+  }
+  .score-pill .label{font-size:12px; opacity:.9;}
+  .score-pill .val{font-size:22px; font-weight:800;}
+
+  .badge-officer{display:inline-block; padding:3px 12px; border-radius:999px; font-weight:800; font-size:13.5px;
+    background:rgba(210,153,34,.18); color:#f0c150; border:1px solid #d29922;}
+
+  .head-stats{display:flex; gap:10px; margin-top:16px;}
+  .hstat{flex:1; min-width:0; background:rgba(255,255,255,.16); border-radius:12px; padding:11px 6px; text-align:center; color:#fff;}
+  .hstat .hv{font-size:20px; font-weight:800; line-height:1.15; word-break:keep-all;}
+  .hstat .hv.gold{color:#ffe08a;}
+  .hstat .hl{font-size:11.5px; opacity:.92; margin-top:4px;}
+
+  .section{background:var(--card); border:1px solid var(--line); border-radius:16px; padding:4px 16px; margin-bottom:12px;}
+  .section h2{font-size:13px; color:var(--muted); font-weight:600; margin:14px 0 8px; letter-spacing:.2px;}
+  .row{display:flex; justify-content:space-between; gap:12px; padding:11px 0; border-top:1px solid var(--line);}
+  .row:first-of-type{border-top:none;}
+  .row .k{color:var(--muted); font-size:14px; flex-shrink:0;}
+  .row .v{font-size:14.5px; text-align:right; word-break:break-all;}
+
+  .chips{display:flex; flex-wrap:wrap; gap:8px; padding:12px 0 14px;}
+  .chip{font-size:13px; padding:7px 12px; border-radius:999px; border:1px solid var(--line); background:var(--card2); color:var(--muted);}
+  .chip.on{background:rgba(46,160,67,.15); border-color:var(--pos); color:#7ee2a0;}
+  .chip.off{opacity:.5;}
+  .chip b{font-weight:600; color:inherit;}
+
+  /* 한줄평 */
+  .rv-list{display:flex; flex-direction:column; gap:8px; padding:6px 0 4px;}
+  .rv-item{background:var(--card2); border:1px solid var(--line); border-radius:12px; padding:10px 12px;}
+  .rv-row{display:flex; justify-content:space-between; align-items:flex-start; gap:8px;}
+  .rv-text{font-size:14px; word-break:break-word; white-space:pre-wrap; flex:1; min-width:0;}
+  .rv-del{flex-shrink:0; background:transparent; border:none; color:var(--muted); font-size:16px;
+    cursor:pointer; padding:0 2px; line-height:1.2; border-radius:6px;}
+  .rv-del:active{color:var(--neg);}
+  .rv-time{font-size:11.5px; color:var(--muted); margin-top:5px;}
+  .rv-empty{color:var(--muted); font-size:13px; padding:10px 2px;}
+  .rv-form{display:flex; gap:8px; align-items:stretch; padding:10px 0 2px;}
+  .rv-form textarea{flex:1; min-width:0; resize:vertical; background:var(--card2); border:1px solid var(--line);
+    border-radius:10px; color:var(--txt); font-size:15px; padding:10px; font-family:inherit; line-height:1.4;}
+  .rv-form textarea:focus{outline:none; border-color:var(--accent2);}
+  .rv-form .btn{align-self:stretch;}
+  .rv-msg{font-size:12.5px; color:#ffb3ae; min-height:1em; padding:2px;}
+
+  .back{margin:6px 0 16px;}
+  .hidden{display:none;}
+  .spinner{width:16px;height:16px;border:2px solid var(--line);border-top-color:var(--accent2);border-radius:50%;animation:spin .8s linear infinite;display:inline-block;vertical-align:middle;margin-right:8px;}
+  @keyframes spin{to{transform:rotate(360deg)}}
+  footer{color:var(--muted); font-size:11.5px; text-align:center; margin-top:30px; line-height:1.6;}
+</style>
+</head>
+<body>
+<div class="wrap">
+
+  <!-- 검색 화면 -->
+  <section id="searchView">
+    <header>
+      <h1>조합원 정보 조회</h1>
+      <p>성함을 입력하면 해당 조합원의 정보를 보여드립니다.</p>
+    </header>
+    <div class="search-box">
+      <input id="nameInput" type="text" inputmode="text" placeholder="성함 입력 (예: 홍길동)" autocomplete="off">
+      <button class="btn" id="searchBtn">조회</button>
+    </div>
+    <p class="hint">동명이인이 있는 경우 지번을 선택하실 수 있습니다.</p>
+    <div id="searchResult"></div>
+  </section>
+
+  <!-- 상세 화면 -->
+  <section id="detailView" class="hidden">
+    <button class="btn btn-sm btn-ghost back" id="backBtn">← 다시 조회</button>
+    <div id="detailBody"></div>
+  </section>
+
+  <footer>비공개 시트 · 실시간 조회</footer>
+</div>
+
+<script>
+/* =======================================================================
+   설정: 아래 API_URL 을 Apps Script 웹앱 배포 URL 로 교체하세요.
+   (Apps Script → 배포 → 새 배포 → 웹 앱 → URL 복사,
+    보통 https://script.google.com/macros/s/XXXX/exec 형태)
+   ======================================================================= */
+var API_URL = "https://script.google.com/macros/s/AKfycbwQJEmYXwAIyhpSwcOXY9csdlpracIdlT3OFy6mQqezAo43xF2xgtmLR7BBdprldGw3rQ/exec";
+
+var dom = function(id){ return document.getElementById(id); };
+var jsonpSeq = 0;
+var currentPerson = { name:"", jibun:"" };
+
+/* ===== JSONP 호출 (CORS 우회) ===== */
+function buildQuery(params){
+  var parts = [];
+  for(var k in params){ if(params.hasOwnProperty(k)) parts.push(encodeURIComponent(k)+"="+encodeURIComponent(params[k])); }
+  return parts.join("&");
+}
+function callApi(params, onOk, onErr){
+  if(API_URL.indexOf("PASTE_YOUR") === 0){
+    onErr("API 주소가 설정되지 않았습니다. index.html 의 API_URL 값을 웹앱 주소로 바꿔주세요.");
+    return;
+  }
+  var cbName = "__jsonp_cb_" + (++jsonpSeq) + "_" + Date.now();
+  var s = document.createElement("script");
+  var timer = setTimeout(function(){ cleanup(); onErr("응답 시간이 초과되었습니다. 잠시 후 다시 시도해 주세요."); }, 15000);
+
+  function cleanup(){
+    clearTimeout(timer);
+    try{ delete window[cbName]; }catch(e){ window[cbName] = undefined; }
+    if(s.parentNode) s.parentNode.removeChild(s);
+  }
+  window[cbName] = function(res){
+    cleanup();
+    if(res && res.ok){ onOk(res); }
+    else { onErr((res && res.error) || "처리 중 오류가 발생했습니다."); }
+  };
+  var sep = API_URL.indexOf("?") >= 0 ? "&" : "?";
+  s.src = API_URL + sep + buildQuery(params) + "&callback=" + cbName;
+  s.onerror = function(){ cleanup(); onErr("서버에 연결하지 못했습니다. 웹앱 주소와 배포(액세스: 모든 사용자) 설정을 확인해 주세요."); };
+  document.body.appendChild(s);
+}
+
+/* ===== 한줄평 ===== */
+function loadReviews(){
+  var list = dom("reviewList");
+  if(!list) return;
+  list.innerHTML = '<div class="rv-empty">불러오는 중…</div>';
+  callApi({ action:"reviews", name:currentPerson.name, jibun:currentPerson.jibun },
+    function(res){ renderReviews(res.reviews || []); },
+    function(err){ list.innerHTML = '<div class="rv-empty">'+esc(err)+'</div>'; });
+}
+function renderReviews(reviews){
+  var list = dom("reviewList");
+  if(!list) return;
+  if(!reviews || reviews.length === 0){
+    list.innerHTML = '<div class="rv-empty">아직 한줄평이 없습니다. 첫 한줄평을 남겨보세요.</div>';
+    return;
+  }
+  var html = "";
+  for(var i = reviews.length - 1; i >= 0; i--){   // 최신순
+    var rv = reviews[i];
+    html += '<div class="rv-item"><div class="rv-row">'
+          +   '<div class="rv-text">'+esc(rv.text)+'</div>'
+          +   '<button class="rv-del" data-id="'+esc(rv.id||"")+'" aria-label="삭제" title="삭제">✕</button>'
+          + '</div>'
+          + '<div class="rv-time">'+esc(rv.time)+'</div></div>';
+  }
+  list.innerHTML = html;
+
+  var dels = list.querySelectorAll(".rv-del");
+  for(var d = 0; d < dels.length; d++){
+    (function(btn){ btn.addEventListener("click", function(){ deleteReview(btn.getAttribute("data-id")); }); })(dels[d]);
+  }
+}
+function deleteReview(id){
+  if(!id) return;
+  if(!window.confirm("이 한줄평을 삭제할까요?")) return;
+  callApi({ action:"delete", id:id, name:currentPerson.name, jibun:currentPerson.jibun },
+    function(res){ renderReviews(res.reviews || []); },
+    function(err){ var msg = dom("reviewMsg"); if(msg) msg.textContent = err; });
+}
+function submitReview(){
+  var inp = dom("reviewInput");
+  var msg = dom("reviewMsg");
+  var txt = (inp.value || "").trim();
+  msg.textContent = "";
+  if(!txt){ msg.textContent = "내용을 입력해 주세요."; return; }
+  var btn = dom("reviewSubmit");
+  btn.disabled = true; btn.textContent = "등록 중…";
+  callApi({ action:"add", name:currentPerson.name, jibun:currentPerson.jibun, text:txt },
+    function(res){
+      btn.disabled = false; btn.textContent = "등록";
+      inp.value = "";
+      renderReviews(res.reviews || []);
+    },
+    function(err){
+      btn.disabled = false; btn.textContent = "등록";
+      msg.textContent = err;
+    });
+}
+
+/* ===== 검색 ===== */
+function doSearch(){
+  var q = (dom("nameInput").value || "").trim();
+  var box = dom("searchResult");
+  if(!q){ box.innerHTML = '<div class="status-msg">성함을 입력해 주세요.</div>'; return; }
+
+  dom("searchBtn").disabled = true;
+  box.innerHTML = '<div class="status-msg"><span class="spinner"></span>조회 중…</div>';
+
+  callApi({ name:q }, function(res){
+    var matches = res.matches || [];
+    dom("searchBtn").disabled = false;
+    if(matches.length === 0){
+      box.innerHTML = '<div class="status-msg">‘'+esc(q)+'’ 님을 찾을 수 없습니다.<br>성함을 다시 확인해 주세요.</div>';
+      return;
+    }
+    if(matches.length === 1){ showDetail(matches[0]); return; }
+    renderPicker(matches);
+  }, function(err){
+    dom("searchBtn").disabled = false;
+    box.innerHTML = '<div class="status-msg err">'+esc(err)+'</div>';
+  });
+}
+
+/* ===== 동명이인 선택 ===== */
+function renderPicker(matches){
+  var box = dom("searchResult");
+  var html = '<div class="pick-title">동명이인이 '+matches.length+'명 있습니다. 해당하는 지번을 선택해 주세요.</div><div class="pick-list">';
+  matches.forEach(function(m, idx){
+    html += '<button class="pick-item" data-idx="'+idx+'">'
+          +   '<div class="jibun">지번 '+esc(m.jibun||"-")+'</div>'
+          +   '<div class="sub">'+esc(m.address||"-")+'</div>'
+          + '</button>';
+  });
+  html += '</div>';
+  box.innerHTML = html;
+  var btns = box.querySelectorAll(".pick-item");
+  for(var b=0;b<btns.length;b++){
+    (function(btn){ btn.addEventListener("click", function(){ showDetail(matches[parseInt(btn.getAttribute("data-idx"),10)]); }); })(btns[b]);
+  }
+}
+
+/* ===== 상세 표시 ===== */
+function yn(v){ return v && String(v).trim() !== ""; }
+function chip(label, v){
+  var on = yn(v);
+  var txt = on ? (String(v).length<=4 ? v : "제출") : "미해당";
+  return '<span class="chip '+(on?"on":"off")+'"><b>'+esc(label)+'</b> '+esc(txt)+'</span>';
+}
+function row(k,v){ return '<div class="row"><span class="k">'+esc(k)+'</span><span class="v">'+esc(v)+'</span></div>'; }
+
+/* 점수 색상: 0=빨강 → 100=초록 */
+function scoreColor(score){
+  var n = parseInt(score, 10);
+  if(isNaN(n)) return "#8b949e";
+  if(n < 0) n = 0; if(n > 100) n = 100;
+  var hue = Math.round(n / 100 * 120); // 0=빨강, 120=초록
+  return "hsl(" + hue + ",62%,45%)";
+}
+
+/* 점수화 게이지 (반원형 계기판: 빨강=친조합 ↔ 초록=착해모) */
+function gaugeCard(score){
+  var n = parseInt(score, 10);
+  var has = !isNaN(n);
+  var v = has ? Math.max(0, Math.min(100, n)) : 50;
+  var theta = Math.PI * (1 - v / 100);          // v=0→180°(좌), v=100→0°(우)
+  var cx = 160, cy = 176, Rn = 100, Rb = 128;
+  var nx = (cx + Rn * Math.cos(theta)).toFixed(1);
+  var ny = (cy - Rn * Math.sin(theta)).toFixed(1);
+  var bx = has ? (cx + Rb * Math.cos(theta)).toFixed(1) : cx;
+  var by = has ? (cy - Rb * Math.sin(theta)).toFixed(1) : 50;
+  var col = scoreColor(has ? n : 50);
+  var nearLabel = has ? (n >= 50 ? "착해모" : "친조합") : "-";
+  var nearCol = has ? (n >= 50 ? "#3fa845" : "#e5372f") : "#8b949e";
+
+  var needle = has
+    ? '<line x1="'+cx+'" y1="'+cy+'" x2="'+nx+'" y2="'+ny+'" stroke="#8b949e" stroke-width="5" stroke-linecap="round"/>'
+      + '<circle cx="'+cx+'" cy="'+cy+'" r="11" fill="#1c232c" stroke="#8b949e" stroke-width="3"/>'
+    : '<circle cx="'+cx+'" cy="'+cy+'" r="11" fill="#30363d"/>';
+
+  var bubble = '<circle cx="'+bx+'" cy="'+by+'" r="19" fill="'+col+'"/>'
+    + '<text x="'+bx+'" y="'+(parseFloat(by)+6).toFixed(1)+'" text-anchor="middle" font-size="18" font-weight="800" fill="#fff">'+esc(has?String(n):"-")+'</text>';
+
+  var svg = '<svg viewBox="0 0 320 226" xmlns="http://www.w3.org/2000/svg" style="width:100%;height:auto;display:block">'
+    + '<defs><linearGradient id="gaugeGrad" x1="0" y1="0" x2="1" y2="0">'
+    +   '<stop offset="0%" stop-color="#e5372f"/><stop offset="50%" stop-color="#e8b21f"/><stop offset="100%" stop-color="#3fa845"/>'
+    + '</linearGradient></defs>'
+    + '<path d="M 34 176 A 126 126 0 0 1 286 176" fill="none" stroke="url(#gaugeGrad)" stroke-width="22" stroke-linecap="round"/>'
+    + '<text x="30" y="201" text-anchor="middle" font-size="12" fill="#8b949e">0</text>'
+    + '<text x="160" y="30" text-anchor="middle" font-size="12" fill="#8b949e">50</text>'
+    + '<text x="290" y="201" text-anchor="middle" font-size="12" fill="#8b949e">100</text>'
+    + needle + bubble
+    + '<text x="42" y="220" text-anchor="middle" font-size="14" font-weight="800" fill="#e5372f">친조합</text>'
+    + '<text x="278" y="220" text-anchor="middle" font-size="14" font-weight="800" fill="#3fa845">착해모</text>'
+    + '</svg>';
+
+  return '<div class="section"><h2>점수화</h2>' + svg
+    + '<div style="text-align:center;padding:4px 0 14px;font-size:14px;color:var(--muted)">현재: '
+    +   '<b style="color:'+nearCol+'">'+esc(nearLabel)+'</b>'+(has?' · '+n+'점':'')
+    + '</div></div>';
+}
+
+/* 임원: 조합장/이사/대의원/감사 등은 강조 배지로 */
+function officerRow(v){
+  var t = (v || "").trim();
+  var roles = ["조합장","이사","대의원","감사","조합원대표","위원"];
+  var hit = t && roles.some(function(r){ return t.indexOf(r) >= 0; });
+  var disp = t ? (hit ? '<span class="badge-officer">'+esc(t)+'</span>' : esc(t)) : "—";
+  return '<div class="row"><span class="k">임원</span><span class="v">'+disp+'</span></div>';
+}
+
+function showDetail(m){
+  currentPerson = { name: m.name || "", jibun: m.jibun || "" };
+
+  var sub = "지번 " + esc(m.jibun||"-")
+          + (m.gender ? ' · '+esc(m.gender) : '');
+
+  var off = (m.officer || "").trim();
+  var offHit = off && ["조합장","이사","대의원","감사","조합원대표","위원"].some(function(r){ return off.indexOf(r) >= 0; });
+  var offDisp = off ? off : "일반";
+  var ageDisp = m.age ? esc(m.age)+"세" : "—";
+  var yearDisp = m.regYear ? esc(m.regYear)+"년" : "—";
+
+  var html = ''
+    + '<div class="detail-head">'
+    +   '<div class="name">'+esc(m.name||"-")+'</div>'
+    +   '<div class="jibun">'+sub+'</div>'
+    +   '<div class="head-stats">'
+    +     '<div class="hstat"><div class="hv'+(offHit?" gold":"")+'">'+esc(offDisp)+'</div><div class="hl">임원</div></div>'
+    +     '<div class="hstat"><div class="hv">'+ageDisp+'</div><div class="hl">나이</div></div>'
+    +     '<div class="hstat"><div class="hv">'+yearDisp+'</div><div class="hl">등기년도</div></div>'
+    +   '</div>'
+    + '</div>'
+
+    + gaugeCard(m.score)
+
+    + '<div class="section"><h2>주소</h2>' + row("주소", m.address || "-") + '</div>'
+
+    + '<div class="section"><h2>참여 현황</h2><div class="chips">'
+    +   chip("4/4서면", m.seo44)
+    +   chip("4/4참석", m.att44)
+    +   chip("4/11철회서", m.withdraw411)
+    +   chip("한스설명회", m.hans)
+    +   chip("4/30발의자", m.propose430)
+    +   chip("4/30철회서", m.withdraw430)
+    +   chip("5/30발의서", m.propose530)
+    +   chip("대깨방", m.daekkae)
+    + '</div></div>'
+
+    + '<div class="section"><h2>부가 정보</h2>'
+    +   officerRow(m.officer)
+    +   row("성남시 소재지", m.resident || "—")
+    +   row("등기여부", m.registered || "—")
+    +   row("등기유형", m.regType || "—")
+    + '</div>'
+
+    + '<div class="section"><h2>한줄평</h2>'
+    +   '<div id="reviewList" class="rv-list"></div>'
+    +   '<div class="rv-form">'
+    +     '<textarea id="reviewInput" rows="2" maxlength="200" placeholder="한줄평을 남겨주세요 (최대 200자)"></textarea>'
+    +     '<button class="btn btn-sm" id="reviewSubmit">등록</button>'
+    +   '</div>'
+    +   '<div id="reviewMsg" class="rv-msg"></div>'
+    + '</div>';
+
+  dom("detailBody").innerHTML = html;
+  dom("reviewSubmit").addEventListener("click", submitReview);
+  loadReviews();
+  dom("searchView").classList.add("hidden");
+  dom("detailView").classList.remove("hidden");
+  window.scrollTo(0,0);
+}
+
+/* ===== 유틸 ===== */
+function esc(s){ return (s==null?"":String(s)).replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/>/g,"&gt;").replace(/"/g,"&quot;"); }
+
+/* ===== 이벤트 ===== */
+dom("searchBtn").addEventListener("click", doSearch);
+dom("nameInput").addEventListener("keydown", function(e){ if(e.key==="Enter"){ e.preventDefault(); doSearch(); } });
+dom("backBtn").addEventListener("click", function(){
+  dom("detailView").classList.add("hidden");
+  dom("searchView").classList.remove("hidden");
+  window.scrollTo(0,0);
+});
+</script>
+</body>
+</html>

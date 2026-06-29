@@ -69,10 +69,11 @@
   .badge-officer{display:inline-block; padding:3px 12px; border-radius:999px; font-weight:800; font-size:13.5px;
     background:rgba(210,153,34,.18); color:#f0c150; border:1px solid #d29922;}
 
-  .head-stats{display:flex; gap:10px; margin-top:16px;}
-  .hstat{flex:1; min-width:0; background:rgba(255,255,255,.16); border-radius:12px; padding:11px 6px; text-align:center; color:#fff;}
-  .hstat .hv{font-size:20px; font-weight:800; line-height:1.15; word-break:keep-all;}
+  .head-stats{display:grid; grid-template-columns:1fr 1fr; gap:10px; margin-top:16px;}
+  .hstat{min-width:0; background:rgba(255,255,255,.16); border-radius:12px; padding:11px 8px; text-align:center; color:#fff;}
+  .hstat .hv{font-size:19px; font-weight:800; line-height:1.15; word-break:keep-all;}
   .hstat .hv.gold{color:#ffe08a;}
+  .hstat .hv.phone{font-size:16px; letter-spacing:-.2px;}
   .hstat .hl{font-size:11.5px; opacity:.92; margin-top:4px;}
 
   .section{background:var(--card); border:1px solid var(--line); border-radius:16px; padding:4px 16px; margin-bottom:12px;}
@@ -104,6 +105,11 @@
   .rv-form textarea:focus{outline:none; border-color:var(--accent2);}
   .rv-form .btn{align-self:stretch;}
   .rv-msg{font-size:12.5px; color:#ffb3ae; min-height:1em; padding:2px;}
+
+  .lock-form{display:flex; gap:8px; padding:6px 0 2px;}
+  .lock-form input{flex:1; min-width:0; padding:12px 12px; font-size:16px; background:var(--card2);
+    border:1px solid var(--line); border-radius:10px; color:var(--txt);}
+  .lock-form input:focus{outline:none; border-color:var(--accent2);}
 
   .back{margin:6px 0 16px;}
   .hidden{display:none;}
@@ -146,9 +152,24 @@
    ======================================================================= */
 var API_URL = "https://script.google.com/macros/s/AKfycbwQJEmYXwAIyhpSwcOXY9csdlpracIdlT3OFy6mQqezAo43xF2xgtmLR7BBdprldGw3rQ/exec";
 
+/* 상세 정보 보호 비밀번호 (원하는 값으로 변경하세요) */
+var DETAIL_PASSWORD = "9999";
+
 var dom = function(id){ return document.getElementById(id); };
 var jsonpSeq = 0;
 var currentPerson = { name:"", jibun:"" };
+var detailUnlocked = false;   // 비밀번호 해제 여부 (세션 동안 유지)
+
+function unlockDetail(){
+  var v = (dom("pwInput").value || "");
+  if(v === DETAIL_PASSWORD){
+    detailUnlocked = true;
+    var lock = dom("lockSection"); if(lock) lock.classList.add("hidden");
+    var area = dom("protectedArea"); if(area) area.classList.remove("hidden");
+  } else {
+    dom("pwMsg").textContent = "비밀번호가 올바르지 않습니다.";
+  }
+}
 
 /* ===== JSONP 호출 (CORS 우회) ===== */
 function buildQuery(params){
@@ -204,7 +225,7 @@ function renderReviews(reviews){
           +   '<div class="rv-text">'+esc(rv.text)+'</div>'
           +   '<button class="rv-del" data-id="'+esc(rv.id||"")+'" aria-label="삭제" title="삭제">✕</button>'
           + '</div>'
-          + '<div class="rv-time">'+esc(rv.time)+'</div></div>';
+          + '<div class="rv-time">'+esc(formatTime(rv.time))+'</div></div>';
   }
   list.innerHTML = html;
 
@@ -291,13 +312,22 @@ function chip(label, v){
 }
 function row(k,v){ return '<div class="row"><span class="k">'+esc(k)+'</span><span class="v">'+esc(v)+'</span></div>'; }
 
-/* 점수 색상: 0=빨강 → 100=초록 */
+/* 점수 색상: 0=빨강 → 100=초록 (게이지 숫자 배지에 사용) */
 function scoreColor(score){
   var n = parseInt(score, 10);
   if(isNaN(n)) return "#8b949e";
   if(n < 0) n = 0; if(n > 100) n = 100;
   var hue = Math.round(n / 100 * 120); // 0=빨강, 120=초록
   return "hsl(" + hue + ",62%,45%)";
+}
+
+/* 헤더 배경: 점수가 가리키는 색과 동일 계열 (가독성 위해 약간 더 진하게) */
+function headGradient(score){
+  var n = parseInt(score, 10);
+  if(isNaN(n)) return "linear-gradient(135deg,#3a3f47,#2b2f36)";
+  if(n < 0) n = 0; if(n > 100) n = 100;
+  var hue = Math.round(n / 100 * 120);
+  return "linear-gradient(135deg,hsl(" + hue + ",62%,43%),hsl(" + hue + ",66%,32%))";
 }
 
 /* 점수화 게이지 (반원형 계기판: 빨강=친조합 ↔ 초록=착해모) */
@@ -362,15 +392,29 @@ function showDetail(m){
   var offDisp = off ? off : "일반";
   var ageDisp = m.age ? esc(m.age)+"세" : "—";
   var yearDisp = m.regYear ? esc(m.regYear)+"년" : "—";
+  var phoneDisp = m.phone ? esc(m.phone) : "—";
 
-  var html = ''
-    + '<div class="detail-head">'
+  // 한줄평 (항상 맨 위에 표시)
+  var reviewSection = ''
+    + '<div class="section"><h2>한줄평 · '+esc(m.name||"-")+'</h2>'
+    +   '<div id="reviewList" class="rv-list"></div>'
+    +   '<div class="rv-form">'
+    +     '<textarea id="reviewInput" rows="2" maxlength="200" placeholder="한줄평을 남겨주세요 (최대 200자)"></textarea>'
+    +     '<button class="btn btn-sm" id="reviewSubmit">등록</button>'
+    +   '</div>'
+    +   '<div id="reviewMsg" class="rv-msg"></div>'
+    + '</div>';
+
+  // 비밀번호로 보호되는 상세 정보
+  var protectedDetails = ''
+    + '<div class="detail-head" style="background:'+headGradient(m.score)+'">'
     +   '<div class="name">'+esc(m.name||"-")+'</div>'
     +   '<div class="jibun">'+sub+'</div>'
     +   '<div class="head-stats">'
     +     '<div class="hstat"><div class="hv'+(offHit?" gold":"")+'">'+esc(offDisp)+'</div><div class="hl">임원</div></div>'
     +     '<div class="hstat"><div class="hv">'+ageDisp+'</div><div class="hl">나이</div></div>'
     +     '<div class="hstat"><div class="hv">'+yearDisp+'</div><div class="hl">등기년도</div></div>'
+    +     '<div class="hstat"><div class="hv phone">'+phoneDisp+'</div><div class="hl">전화번호</div></div>'
     +   '</div>'
     + '</div>'
 
@@ -394,20 +438,31 @@ function showDetail(m){
     +   row("성남시 소재지", m.resident || "—")
     +   row("등기여부", m.registered || "—")
     +   row("등기유형", m.regType || "—")
-    + '</div>'
-
-    + '<div class="section"><h2>한줄평</h2>'
-    +   '<div id="reviewList" class="rv-list"></div>'
-    +   '<div class="rv-form">'
-    +     '<textarea id="reviewInput" rows="2" maxlength="200" placeholder="한줄평을 남겨주세요 (최대 200자)"></textarea>'
-    +     '<button class="btn btn-sm" id="reviewSubmit">등록</button>'
-    +   '</div>'
-    +   '<div id="reviewMsg" class="rv-msg"></div>'
     + '</div>';
+
+  // 잠금 화면
+  var lockSection = ''
+    + '<div class="section" id="lockSection"><h2>상세 정보</h2>'
+    +   '<p class="hint" style="margin:0 2px 8px">비밀번호를 입력하면 점수·주소·참여현황 등 상세 정보가 표시됩니다.</p>'
+    +   '<div class="lock-form">'
+    +     '<input id="pwInput" type="password" inputmode="numeric" placeholder="비밀번호 입력" autocomplete="off">'
+    +     '<button class="btn btn-sm" id="pwBtn">확인</button>'
+    +   '</div>'
+    +   '<div id="pwMsg" class="rv-msg"></div>'
+    + '</div>';
+
+  var html = reviewSection
+    + (detailUnlocked
+        ? protectedDetails
+        : lockSection + '<div id="protectedArea" class="hidden">' + protectedDetails + '</div>');
 
   dom("detailBody").innerHTML = html;
   dom("reviewSubmit").addEventListener("click", submitReview);
   loadReviews();
+  if(!detailUnlocked && dom("pwBtn")){
+    dom("pwBtn").addEventListener("click", unlockDetail);
+    dom("pwInput").addEventListener("keydown", function(e){ if(e.key==="Enter"){ e.preventDefault(); unlockDetail(); } });
+  }
   dom("searchView").classList.add("hidden");
   dom("detailView").classList.remove("hidden");
   window.scrollTo(0,0);
@@ -415,6 +470,21 @@ function showDetail(m){
 
 /* ===== 유틸 ===== */
 function esc(s){ return (s==null?"":String(s)).replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/>/g,"&gt;").replace(/"/g,"&quot;"); }
+
+/* 한줄평 시간 표시: "26/6/30 오후 2시 54분" 형태 */
+function formatTime(raw){
+  if(!raw) return "";
+  var d = new Date(raw);
+  if(isNaN(d.getTime())) return String(raw);   // 변환 불가 시 원문 그대로
+  var yy = String(d.getFullYear()).slice(-2);
+  var mo = d.getMonth() + 1;
+  var da = d.getDate();
+  var h = d.getHours();
+  var ap = h < 12 ? "오전" : "오후";
+  var h12 = h % 12; if(h12 === 0) h12 = 12;
+  var mi = d.getMinutes();
+  return yy + "/" + mo + "/" + da + " " + ap + " " + h12 + "시 " + mi + "분";
+}
 
 /* ===== 이벤트 ===== */
 dom("searchBtn").addEventListener("click", doSearch);
